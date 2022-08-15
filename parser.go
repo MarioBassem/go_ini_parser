@@ -7,17 +7,32 @@ import (
 	"strings"
 )
 
-type Parser struct {
-	Data map[string]map[string]string
+type keyVal map[string]string
+type parser struct {
+	data map[string]keyVal
 }
 
-func NewParser() Parser {
-	p := Parser{}
-	p.Data = make(map[string]map[string]string)
+func NewParser() parser {
+	p := parser{}
+	p.data = make(map[string]keyVal)
 	return p
 }
 
-func (p *Parser) ReadFile(path string) error {
+func (p *parser) String() string {
+	ret := ""
+	for section, pairs := range p.data {
+		if section != "" {
+			ret += "[" + section + "]\n"
+		}
+		for key, val := range pairs {
+			ret += key + " = " + val + "\n"
+		}
+		ret += "\n"
+	}
+	return ret
+}
+
+func (p *parser) ReadFile(path string) error {
 	file, err := os.Open(path)
 	if err != nil {
 		return err
@@ -74,17 +89,17 @@ func isKeyVal(line string) bool {
 	return true
 }
 
-func (p *Parser) AddSection(section string) error {
+func (p *parser) AddSection(section string) error {
 	if !isSection("[" + section + "]") {
 		return fmt.Errorf("section %s is invalid", section)
 	}
-	if _, ok := p.Data[section]; !ok {
-		p.Data[section] = make(map[string]string)
+	if _, ok := p.data[section]; !ok {
+		p.data[section] = make(map[string]string)
 	}
 	return nil
 }
 
-func (p *Parser) AddKeyVal(section, key, val string) error {
+func (p *parser) AddKeyVal(section, key, val string) error {
 	err := p.AddSection(section)
 	if err != nil {
 		return err
@@ -92,34 +107,26 @@ func (p *Parser) AddKeyVal(section, key, val string) error {
 	if !isKeyVal(key + " = " + val) {
 		return fmt.Errorf("key value pair \"%s, %s\" is invalid", key, val)
 	}
-	p.Data[section][key] = val
+	p.data[section][key] = val
 	return nil
 }
 
-func (p *Parser) WriteToFile(path string) error {
+func (p *parser) WriteToFile(path string) error {
 	file, err := os.OpenFile(path, os.O_CREATE|os.O_TRUNC|os.O_WRONLY, 0644)
 	if err != nil {
 		return err
 	}
 	defer file.Close()
 
-	for section, pairs := range p.Data {
+	for section, pairs := range p.data {
 		if section != "" {
-			_, err := file.WriteString("[" + section + "]")
+			_, err := file.WriteString("[" + section + "]\n")
 			if err != nil {
 				return err
 			}
-		}
-		_, err := file.WriteString("\n")
-		if err != nil {
-			return err
 		}
 		for key, val := range pairs {
-			_, err := file.WriteString(key + " = " + val)
-			if err != nil {
-				return err
-			}
-			_, err = file.WriteString("\n")
+			_, err := file.WriteString(key + " = " + val + "\n")
 			if err != nil {
 				return err
 			}
